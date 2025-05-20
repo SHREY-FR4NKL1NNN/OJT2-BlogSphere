@@ -20,3 +20,6 @@ mongoose.connect(process.env.MONGO_URI)
     app.listen(process.env.PORT, () => console.log(`Server running on port ${process.env.PORT}`))
   })
   .catch(err => console.error("MongoDB connection error:", err))
+
+  const blogRoutes = require("./routes/blogRoutes")
+app.use("/api/blogs", blogRoutes)
