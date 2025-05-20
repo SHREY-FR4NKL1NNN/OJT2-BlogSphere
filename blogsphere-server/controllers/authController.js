@@ -30,6 +30,7 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email })
     if (!user) return res.status(404).json({ msg: "User not found" })
 
+    // Always use bcrypt.compare for all users (including Google)
     const isMatch = await bcrypt.compare(password, user.password)
     if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" })
 
@@ -41,5 +42,35 @@ exports.login = async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ msg: "Login failed", error: err.message })
+  }
+}
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { username, password, newPassword } = req.body
+
+    const user = await User.findById(userId)
+    if (!user) return res.status(404).json({ msg: "User not found" })
+
+    // Update username if provided
+    if (username && username !== user.username) {
+      user.username = username
+    }
+
+    // Update password if both current and new password are provided
+    if (password && newPassword) {
+      const isMatch = await require("bcryptjs").compare(password, user.password)
+      if (!isMatch) return res.status(400).json({ msg: "Current password is incorrect" })
+      user.password = newPassword
+    }
+
+    await user.save()
+    res.json({ username: user.username })
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ msg: "Username already taken" })
+    }
+    res.status(500).json({ msg: "Profile update failed", error: err.message })
   }
 }
