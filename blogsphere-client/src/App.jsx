@@ -10,6 +10,8 @@ import SidePanel from "./components/Sidepanel.jsx"
 import CreateBlog from "./pages/CreateBlog"
 import BlogDetail from "./pages/BlogDetail"
 import EditBlog from "./pages/EditBlog.jsx"
+import Settings from "./pages/Settings"
+import UserProfile from "./pages/UserProfile"
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
       <Route path="*" element={<NotFound />} />
       <Route path="/blogs/:id" element={<BlogDetail />} />
       <Route path="/edit/:id" element={<PrivateRoute><EditBlog /></PrivateRoute>}/>
+      <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+      <Route path="/user/:userId" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
     </Routes>
     </>
   )

@@ -13,6 +13,9 @@ export default function Profile() {
     newPassword: ""
   })
   const [loading, setLoading] = useState(false)
+  const [following, setFollowing] = useState([])
+  const [avatar, setAvatar] = useState(user.avatar ? getFullUrl(user.avatar) : "")
+  const [avatarFile, setAvatarFile] = useState(null)
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -20,10 +23,17 @@ export default function Profile() {
         const res = await API.get(`/blogs/user/${user.id}`)
         setBlogs(res.data)
       } catch (err) {
-        console.error(err)
+        setBlogs([])
       }
     }
+    const fetchFollowing = async () => {
+      try {
+        const res = await API.get("/auth/following")
+        setFollowing(res.data)
+      } catch {}
+    }
     fetchBlogs()
+    fetchFollowing()
   }, [user.id])
 
   const handleChange = (e) => {
@@ -71,9 +81,55 @@ export default function Profile() {
     }
   }
 
+  const handleAvatarChange = (e) => {
+    setAvatarFile(e.target.files[0])
+  }
+
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) return
+    const formData = new FormData()
+    formData.append("avatar", avatarFile)
+    try {
+      const res = await API.post("/auth/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      })
+      const avatarUrl = getFullUrl(res.data.avatar)
+      setAvatar(avatarUrl)
+      login({ ...user, avatar: avatarUrl })
+      alert("Avatar updated!")
+    } catch {
+      alert("Failed to upload avatar")
+    }
+  }
+
+  function getFullUrl(path) {
+    if (!path) return ""
+    if (path.startsWith("http")) return path
+    // Adjust the base URL if needed
+    return `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${path}`
+  }
+
   return (
     <div className="max-w-4xl mx-auto mt-10">
-      <h2 className="text-3xl font-bold mb-6">👤 {user.username}'s Profile</h2>
+      <h2 className="text-3xl font-bold mb-6">
+        👤 {user.username}'s Profile
+      </h2>
+      <div className="mb-4 flex items-center gap-4">
+        {avatar && (
+          <img src={avatar} alt="avatar" className="w-20 h-20 rounded-full object-cover border" />
+        )}
+        <div>
+          <input type="file" accept="image/*" onChange={handleAvatarChange} />
+          <button
+            className="ml-2 bg-blue-600 text-white px-3 py-1 rounded"
+            onClick={handleAvatarUpload}
+            type="button"
+            disabled={!avatarFile}
+          >
+            Upload Avatar
+          </button>
+        </div>
+      </div>
       <p className="mb-2"><strong>Email:</strong> {user.email}</p>
       <p className="mb-6"><strong>Role:</strong> {user.role}</p>
 
@@ -139,8 +195,20 @@ export default function Profile() {
         </form>
       )}
 
-      <h3 className="text-2xl font-semibold mb-4">📝 Your Blogs</h3>
+      <h3 className="text-2xl font-semibold mb-4">👥 Following</h3>
+      <ul className="mb-6">
+        {following.length === 0 ? (
+          <li>You are not following anyone yet.</li>
+        ) : (
+          following.map(f => (
+            <li key={f._id}>
+              <Link to={`/user/${f._id}`} className="text-blue-600 hover:underline">{f.username}</Link>
+            </li>
+          ))
+        )}
+      </ul>
 
+      <h3 className="text-2xl font-semibold mb-4">📝 Your Blogs</h3>
       {blogs.length === 0 ? (
         <p>You haven’t posted anything yet.</p>
       ) : (
@@ -148,13 +216,13 @@ export default function Profile() {
           {blogs.map((blog) => (
             <div key={blog._id} className="border rounded shadow hover:shadow-md transition">
               <Link to={`/blogs/${blog._id}`}>
-              {blog.coverImage && (
-                <img src={blog.coverImage} alt={blog.title} className="h-40 w-full object-cover rounded-t" />
-              )}
-              <div className="p-3">
-                <h4 className="text-lg font-semibold">{blog.title}</h4>
-                <p className="text-sm text-gray-600 truncate">{blog.content.slice(0, 100)}...</p>
-              </div>
+                {blog.coverImage && (
+                  <img src={blog.coverImage} alt={blog.title} className="h-40 w-full object-cover rounded-t" />
+                )}
+                <div className="p-3">
+                  <h4 className="text-lg font-semibold">{blog.title}</h4>
+                  <p className="text-sm text-gray-600 truncate">{blog.content.slice(0, 100)}...</p>
+                </div>
               </Link>
             </div>
           ))}
