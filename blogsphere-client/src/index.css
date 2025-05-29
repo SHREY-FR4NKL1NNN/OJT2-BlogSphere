@@ -1,1 +1,63 @@
 @import "tailwindcss";
+
+/* Light/dark theme variables */
+:root,
+[data-theme="light"] {
+  --bg-main: #f9fafb;
+  --bg-card: #fff;
+  --text-main: #111827;
+  --text-secondary: #374151;
+  --border: #e5e7eb;
+  --tag-bg: #dbeafe;
+  --tag-text: #2563eb;
+}
+
+[data-theme="dark"] {
+  --bg-main: #111827;
+  --bg-card: #1f2937;
+  --text-main: #f3f4f6;
+  --text-secondary: #d1d5db;
+  --border: #374151;
+  --tag-bg: #1e40af;
+  --tag-text: #93c5fd;
+}
+
+html,
+body {
+  background: var(--bg-main);
+  color: var(--text-main);
+  transition: background 0.2s, color 0.2s;
+}
+
+@layer base {
+  html {
+    @apply transition-colors;
+  }
+  body {
+    @apply transition-colors;
+  }
+}
+
+.bg-main {
+  background: var(--bg-main);
+}
+.bg-card {
+  background: var(--bg-card);
+}
+.text-main {
+  color: var(--text-main);
+}
+.text-secondary {
+  color: var(--text-secondary);
+}
+.border-main {
+  border-color: var(--border);
+}
+.tag {
+  background: var(--tag-bg);
+  color: var(--tag-text);
+  border-radius: 9999px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.875rem;
+  display: inline-block;
+}

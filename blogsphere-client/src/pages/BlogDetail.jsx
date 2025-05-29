@@ -2,11 +2,13 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 export default function BlogDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [blog, setBlog] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
@@ -16,6 +18,7 @@ export default function BlogDetail() {
   const [liked, setLiked] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const [bookmarked, setBookmarked] = useState(false);
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -56,6 +59,19 @@ export default function BlogDetail() {
         }
       }
     };
+
+    // Check if bookmarked from backend
+    const checkBookmarked = async () => {
+      if (!user) return setBookmarked(false);
+      try {
+        const res = await API.get("/auth/bookmarks");
+        setBookmarked(res.data.some((b) => b._id === id));
+      } catch {
+        setBookmarked(false);
+      }
+    };
+    checkBookmarked();
+
     fetchBlog();
     fetchComments();
     fetchLikes();
@@ -92,8 +108,14 @@ export default function BlogDetail() {
 
   const handleSaveEdit = async (commentId) => {
     try {
-      const res = await API.put(`/blogs/${id}/comments/${commentId}`, { text: editingText });
-      setComments(comments.map(c => c._id === commentId ? { ...c, text: res.data.text } : c));
+      const res = await API.put(`/blogs/${id}/comments/${commentId}`, {
+        text: editingText,
+      });
+      setComments(
+        comments.map((c) =>
+          c._id === commentId ? { ...c, text: res.data.text } : c
+        )
+      );
       setEditingCommentId(null);
       setEditingText("");
     } catch (err) {
@@ -105,7 +127,7 @@ export default function BlogDetail() {
     if (!window.confirm("Delete this comment?")) return;
     try {
       await API.delete(`/blogs/${id}/comments/${commentId}`);
-      setComments(comments.filter(c => c._id !== commentId));
+      setComments(comments.filter((c) => c._id !== commentId));
     } catch (err) {
       alert("Failed to delete comment");
     }
@@ -131,7 +153,9 @@ export default function BlogDetail() {
   const handleReply = async (commentId) => {
     if (!replyText.trim()) return;
     try {
-      await API.post(`/blogs/${id}/comments/${commentId}/replies`, { text: replyText });
+      await API.post(`/blogs/${id}/comments/${commentId}/replies`, {
+        text: replyText,
+      });
       // Refresh comments to show new reply
       const res = await API.get(`/blogs/${id}/comments`);
       setComments(res.data);
@@ -139,6 +163,21 @@ export default function BlogDetail() {
       setReplyText("");
     } catch (err) {
       alert("Failed to add reply");
+    }
+  };
+
+  const handleBookmark = async () => {
+    if (!user) return;
+    try {
+      if (bookmarked) {
+        await API.delete(`/auth/bookmark/${id}`);
+        setBookmarked(false);
+      } else {
+        await API.post(`/auth/bookmark/${id}`);
+        setBookmarked(true);
+      }
+    } catch {
+      alert("Failed to update bookmark");
     }
   };
 
@@ -157,10 +196,10 @@ export default function BlogDetail() {
   const isAuthor = user?.id === blog.author?._id;
 
   return (
-    <div className="md:ml-64 px-4">
-      {" "}
-      {/* Added md:ml-64 for sidebar width */}
-      <div className="max-w-3xl mx-auto mt-10 space-y-4">
+    <div
+      className={`md:ml-64 px-4 min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors`}
+    >
+      <div className="max-w-3xl mx-auto mt-10 space-y-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 transition-colors">
         {blog.coverImage && (
           <img
             src={blog.coverImage}
@@ -175,10 +214,27 @@ export default function BlogDetail() {
           <p>
             By{" "}
             <Link
-              to={`/user/${blog.author?._id}`}
-              className="text-blue-600 hover:underline"
+              to={
+                blog.author?.username === "deleted user"
+                  ? "#"
+                  : blog.author?._id === user?.id
+                  ? "/profile"
+                  : `/user/${blog.author?._id}`
+              }
+              className={`${
+                blog.author?.username === "deleted user"
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-blue-600 hover:underline"
+              }`}
+              onClick={
+                blog.author?.username === "deleted user"
+                  ? (e) => e.preventDefault()
+                  : undefined
+              }
             >
-              {blog.author?.username}
+              {blog.author?.username === "deleted user"
+                ? "deleted user"
+                : blog.author?.username}
             </Link>
           </p>
           <div className="flex space-x-4">
@@ -208,14 +264,31 @@ export default function BlogDetail() {
         {/* Like button and count */}
         <div className="flex items-center gap-2 mt-2">
           <button
-            className={`px-3 py-1 rounded ${liked ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+            className={`px-3 py-1 rounded ${
+              liked
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+            } transition`}
             onClick={handleLike}
             disabled={!user}
             title={user ? (liked ? "Unlike" : "Like") : "Login to like"}
           >
             {liked ? "💙 Liked" : "🤍 Like"}
           </button>
-          <span className="text-gray-700">{likes} {likes === 1 ? "like" : "likes"}</span>
+          <span className="text-gray-700 dark:text-gray-200">
+            {likes} {likes === 1 ? "like" : "likes"}
+          </span>
+          <button
+            className={`ml-4 px-3 py-1 rounded ${
+              bookmarked
+                ? "bg-yellow-400 text-white"
+                : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+            } transition`}
+            onClick={handleBookmark}
+            title={bookmarked ? "Remove Bookmark" : "Bookmark this blog"}
+          >
+            {bookmarked ? "🔖 Bookmarked" : "🔖 Bookmark"}
+          </button>
         </div>
 
         {/* Comments Section */}
@@ -228,28 +301,56 @@ export default function BlogDetail() {
                 className="flex-1 border p-2 rounded"
                 placeholder="Add a comment..."
                 value={commentText}
-                onChange={e => setCommentText(e.target.value)}
+                onChange={(e) => setCommentText(e.target.value)}
               />
-              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
                 Post
               </button>
             </form>
           )}
           <div className="space-y-3">
-            {comments.length === 0 && <p className="text-gray-500">No comments yet.</p>}
+            {comments.length === 0 && (
+              <p className="text-gray-500">No comments yet.</p>
+            )}
             {comments.map((comment) => {
-              const isCommentAuthor = user && comment.user && user.id === (comment.user._id || comment.user)
-              const isBlogAuthor = user && blog.author && user.id === (blog.author._id || blog.author)
+              const isCommentAuthor =
+                user &&
+                comment.user &&
+                user.id === (comment.user._id || comment.user);
+              const isBlogAuthor =
+                user &&
+                blog.author &&
+                user.id === (blog.author._id || blog.author);
               return (
                 <div key={comment._id} className="border rounded p-2 mb-2">
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="font-semibold">
                         <Link
-                          to={`/user/${comment.user?._id || comment.user}`}
-                          className="text-blue-600 hover:underline"
+                          to={
+                            comment.user?.username === "deleted user"
+                              ? "#"
+                              : comment.user?._id === user?.id
+                              ? "/profile"
+                              : `/user/${comment.user?._id || comment.user}`
+                          }
+                          className={`${
+                            comment.user?.username === "deleted user"
+                              ? "text-gray-400 cursor-not-allowed"
+                              : "text-blue-600 hover:underline"
+                          }`}
+                          onClick={
+                            comment.user?.username === "deleted user"
+                              ? (e) => e.preventDefault()
+                              : undefined
+                          }
                         >
-                          {comment.user?.username || "User"}
+                          {comment.user?.username === "deleted user"
+                            ? "deleted user"
+                            : comment.user?.username || "User"}
                         </Link>
                       </span>
                       <span className="ml-2 text-xs text-gray-500">
@@ -260,7 +361,7 @@ export default function BlogDetail() {
                           <input
                             className="border rounded p-1 flex-1"
                             value={editingText}
-                            onChange={e => setEditingText(e.target.value)}
+                            onChange={(e) => setEditingText(e.target.value)}
                           />
                           <button
                             className="bg-green-600 text-white px-2 py-1 rounded"
@@ -282,7 +383,6 @@ export default function BlogDetail() {
                       )}
                     </div>
                     <div className="flex gap-2 ml-2">
-                      {/* Delete: visible for comment author OR blog author */}
                       {(isCommentAuthor || isBlogAuthor) && (
                         <button
                           className="text-red-600 text-xs"
@@ -291,7 +391,6 @@ export default function BlogDetail() {
                           Delete
                         </button>
                       )}
-                      {/* Edit: only comment author */}
                       {isCommentAuthor && (
                         <button
                           className="text-blue-600 text-xs"
@@ -314,27 +413,44 @@ export default function BlogDetail() {
                   </div>
                   {/* Replies */}
                   <div className="ml-6 mt-2 space-y-2">
-                    {comment.replies && comment.replies.map((reply) => (
-                      <div key={reply._id} className="border-l-2 pl-2">
-                        <span className="font-semibold">
-                          <Link
-                            to={`/user/${reply.user?._id || reply.user}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            {reply.user?.username || "User"}
-                          </Link>
-                        </span>
-                        <span className="ml-2 text-xs text-gray-500">
-                          {new Date(reply.createdAt).toLocaleString()}
-                        </span>
-                        <p className="mt-1">{reply.text}</p>
-                      </div>
-                    ))}
-                    {/* Reply input */}
+                    {comment.replies &&
+                      comment.replies.map((reply) => (
+                        <div key={reply._id} className="border-l-2 pl-2">
+                          <span className="font-semibold">
+                            <Link
+                              to={
+                                reply.user?.username === "deleted user"
+                                  ? "#"
+                                  : reply.user?._id === user?.id
+                                  ? "/profile"
+                                  : `/user/${reply.user?._id || reply.user}`
+                              }
+                              className={`${
+                                reply.user?.username === "deleted user"
+                                  ? "text-gray-400 cursor-not-allowed"
+                                  : "text-blue-600 hover:underline"
+                              }`}
+                              onClick={
+                                reply.user?.username === "deleted user"
+                                  ? (e) => e.preventDefault()
+                                  : undefined
+                              }
+                            >
+                              {reply.user?.username === "deleted user"
+                                ? "deleted user"
+                                : reply.user?.username || "User"}
+                            </Link>
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            {new Date(reply.createdAt).toLocaleString()}
+                          </span>
+                          <p className="mt-1">{reply.text}</p>
+                        </div>
+                      ))}
                     {replyingTo === comment._id && (
                       <form
                         className="flex gap-2 mt-2"
-                        onSubmit={e => {
+                        onSubmit={(e) => {
                           e.preventDefault();
                           handleReply(comment._id);
                         }}
@@ -344,9 +460,12 @@ export default function BlogDetail() {
                           className="flex-1 border p-1 rounded"
                           placeholder="Write a reply..."
                           value={replyText}
-                          onChange={e => setReplyText(e.target.value)}
+                          onChange={(e) => setReplyText(e.target.value)}
                         />
-                        <button type="submit" className="bg-green-600 text-white px-2 py-1 rounded">
+                        <button
+                          type="submit"
+                          className="bg-green-600 text-white px-2 py-1 rounded"
+                        >
                           Reply
                         </button>
                         <button
@@ -360,11 +479,10 @@ export default function BlogDetail() {
                     )}
                   </div>
                 </div>
-              )}
-            )}
+              );
+            })}
           </div>
         </div>
-
         {isAuthor && (
           <div className="flex gap-4 mt-6">
             <Link
