@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 import API from "../services/api"
@@ -10,8 +10,12 @@ export default function Register() {
     username: "", email: "", password: ""
   })
 
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (user) navigate("/")
+  }, [user, navigate])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -33,21 +37,21 @@ export default function Register() {
     try {
       const result = await signInWithPopup(auth, googleProvider)
       const { user: googleUser } = result
-      // Always generate a unique username for Google users
-      const baseUsername =
-        googleUser.displayName?.replace(/\s+/g, "") ||
-        googleUser.email.split("@")[0]
-      const uniqueUsername = `${baseUsername}_${googleUser.uid.slice(0, 6)}`
+      let baseUsername =
+        googleUser.displayName?.replace(/[^a-zA-Z0-9_]/g, "")
+      if (!baseUsername || baseUsername.length < 3) {
+        baseUsername = googleUser.email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "")
+      }
+      const Username = baseUsername
       try {
         const res = await API.post("/auth/register", {
-          username: uniqueUsername,
+          username: Username,
           email: googleUser.email,
           password: googleUser.uid
         })
         login({ ...res.data.user, token: res.data.token })
         navigate("/")
       } catch (err) {
-        // If already registered (email or username), fallback to login
         if (
           err?.response?.data?.msg === "User already exists" ||
           err?.response?.data?.error?.includes("duplicate key")

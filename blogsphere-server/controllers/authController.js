@@ -30,7 +30,6 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email })
     if (!user) return res.status(404).json({ msg: "User not found" })
 
-    // Always use bcrypt.compare for all users (including Google)
     const isMatch = await bcrypt.compare(password, user.password)
     if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" })
 
@@ -53,12 +52,10 @@ exports.updateProfile = async (req, res) => {
     const user = await User.findById(userId)
     if (!user) return res.status(404).json({ msg: "User not found" })
 
-    // Update username if provided
     if (username && username !== user.username) {
       user.username = username
     }
 
-    // Update password if both current and new password are provided
     if (password && newPassword) {
       const isMatch = await require("bcryptjs").compare(password, user.password)
       if (!isMatch) return res.status(400).json({ msg: "Current password is incorrect" })
@@ -72,5 +69,86 @@ exports.updateProfile = async (req, res) => {
       return res.status(400).json({ msg: "Username already taken" })
     }
     res.status(500).json({ msg: "Profile update failed", error: err.message })
+  }
+}
+
+exports.deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id
+    await require("../models/user").findByIdAndDelete(userId)
+    res.json({ msg: "Account deleted" })
+  } catch (err) {
+    res.status(500).json({ msg: "Failed to delete account", error: err.message })
+  }
+}
+
+exports.followUser = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const targetId = req.params.id
+    if (userId === targetId) return res.status(400).json({ msg: "Cannot follow yourself" })
+    const User = require("../models/user")
+    const user = await User.findById(userId)
+    const target = await User.findById(targetId)
+    if (!target) return res.status(404).json({ msg: "User not found" })
+    if (user.following.includes(targetId)) return res.status(400).json({ msg: "Already following" })
+    user.following.push(targetId)
+    target.followers.push(userId)
+    await user.save()
+    await target.save()
+    res.json({ msg: "Followed" })
+  } catch (err) {
+    res.status(500).json({ msg: "Follow failed", error: err.message })
+  }
+}
+
+exports.unfollowUser = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const targetId = req.params.id
+    const User = require("../models/user")
+    const user = await User.findById(userId)
+    const target = await User.findById(targetId)
+    if (!target) return res.status(404).json({ msg: "User not found" })
+    user.following = user.following.filter(id => id.toString() !== targetId)
+    target.followers = target.followers.filter(id => id.toString() !== userId)
+    await user.save()
+    await target.save()
+    res.json({ msg: "Unfollowed" })
+  } catch (err) {
+    res.status(500).json({ msg: "Unfollow failed", error: err.message })
+  }
+}
+
+exports.getFollowing = async (req, res) => {
+  try {
+    const User = require("../models/user")
+    const user = await User.findById(req.user.id).populate("following", "username")
+    res.json(user.following)
+  } catch (err) {
+    res.status(500).json({ msg: "Failed to get following", error: err.message })
+  }
+}
+
+exports.getUserById = async (req, res) => {
+  try {
+    const User = require("../models/user")
+    const user = await User.findById(req.params.id).select("_id username email role")
+    if (!user) return res.status(404).json({ msg: "User not found" })
+    res.json(user)
+  } catch (err) {
+    res.status(500).json({ msg: "Failed to get user", error: err.message })
+  }
+}
+
+exports.uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ msg: "No file uploaded" })
+    const user = await User.findById(req.user.id)
+    user.avatar = `/uploads/avatars/${req.file.filename}`
+    await user.save()
+    res.json({ avatar: user.avatar })
+  } catch (err) {
+    res.status(500).json({ msg: "Failed to upload avatar", error: err.message })
   }
 }

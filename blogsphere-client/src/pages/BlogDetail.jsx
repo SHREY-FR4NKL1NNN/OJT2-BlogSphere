@@ -8,6 +8,14 @@ export default function BlogDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [blog, setBlog] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingText, setEditingText] = useState("");
+  const [likes, setLikes] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -18,8 +26,40 @@ export default function BlogDetail() {
         console.error(err);
       }
     };
+
+    const fetchComments = async () => {
+      try {
+        const res = await API.get(`/blogs/${id}/comments`);
+        setComments(res.data);
+      } catch (err) {
+        setComments([]);
+      }
+    };
+
+    const fetchLikes = async () => {
+      if (user) {
+        try {
+          const res = await API.get(`/blogs/${id}/likes`);
+          setLikes(res.data.likes);
+          setLiked(res.data.liked);
+        } catch {
+          setLikes(0);
+          setLiked(false);
+        }
+      } else {
+        try {
+          const res = await API.get(`/blogs/${id}`);
+          setLikes(res.data.likes ? res.data.likes.length : 0);
+          setLiked(false);
+        } catch {
+          setLikes(0);
+        }
+      }
+    };
     fetchBlog();
-  }, [id]);
+    fetchComments();
+    fetchLikes();
+  }, [id, user]);
 
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this blog?")) return;
@@ -29,6 +69,76 @@ export default function BlogDetail() {
     } catch (err) {
       console.error("Delete failed:", err);
       alert("You’re not authorized to delete this blog.");
+    }
+  };
+
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+    try {
+      await API.post(`/blogs/${id}/comments`, { text: commentText });
+      const res = await API.get(`/blogs/${id}/comments`);
+      setComments(res.data);
+      setCommentText("");
+    } catch (err) {
+      alert("Failed to add comment");
+    }
+  };
+
+  const handleEditComment = (comment) => {
+    setEditingCommentId(comment._id);
+    setEditingText(comment.text);
+  };
+
+  const handleSaveEdit = async (commentId) => {
+    try {
+      const res = await API.put(`/blogs/${id}/comments/${commentId}`, { text: editingText });
+      setComments(comments.map(c => c._id === commentId ? { ...c, text: res.data.text } : c));
+      setEditingCommentId(null);
+      setEditingText("");
+    } catch (err) {
+      alert("Failed to update comment");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Delete this comment?")) return;
+    try {
+      await API.delete(`/blogs/${id}/comments/${commentId}`);
+      setComments(comments.filter(c => c._id !== commentId));
+    } catch (err) {
+      alert("Failed to delete comment");
+    }
+  };
+
+  const handleLike = async () => {
+    if (!user) return;
+    try {
+      if (liked) {
+        const res = await API.post(`/blogs/${id}/unlike`);
+        setLikes(res.data.likes);
+        setLiked(false);
+      } else {
+        const res = await API.post(`/blogs/${id}/like`);
+        setLikes(res.data.likes);
+        setLiked(true);
+      }
+    } catch (err) {
+      alert("Failed to update like");
+    }
+  };
+
+  const handleReply = async (commentId) => {
+    if (!replyText.trim()) return;
+    try {
+      await API.post(`/blogs/${id}/comments/${commentId}/replies`, { text: replyText });
+      // Refresh comments to show new reply
+      const res = await API.get(`/blogs/${id}/comments`);
+      setComments(res.data);
+      setReplyingTo(null);
+      setReplyText("");
+    } catch (err) {
+      alert("Failed to add reply");
     }
   };
 
@@ -62,7 +172,15 @@ export default function BlogDetail() {
 
         {/* Author and dates info */}
         <div className="flex flex-col space-y-2 text-sm text-gray-600">
-          <p>By {blog.author?.username}</p>
+          <p>
+            By{" "}
+            <Link
+              to={`/user/${blog.author?._id}`}
+              className="text-blue-600 hover:underline"
+            >
+              {blog.author?.username}
+            </Link>
+          </p>
           <div className="flex space-x-4">
             <div className="bg-gray-100 p-2 rounded">
               <span className="font-medium">Created:</span>{" "}
@@ -86,6 +204,166 @@ export default function BlogDetail() {
           ))}
         </div>
         <p className="mt-4 whitespace-pre-line">{blog.content}</p>
+
+        {/* Like button and count */}
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            className={`px-3 py-1 rounded ${liked ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+            onClick={handleLike}
+            disabled={!user}
+            title={user ? (liked ? "Unlike" : "Like") : "Login to like"}
+          >
+            {liked ? "💙 Liked" : "🤍 Like"}
+          </button>
+          <span className="text-gray-700">{likes} {likes === 1 ? "like" : "likes"}</span>
+        </div>
+
+        {/* Comments Section */}
+        <div className="mt-10">
+          <h3 className="text-xl font-semibold mb-2">💬 Comments</h3>
+          {user && (
+            <form onSubmit={handleAddComment} className="flex gap-2 mb-4">
+              <input
+                type="text"
+                className="flex-1 border p-2 rounded"
+                placeholder="Add a comment..."
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+              />
+              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+                Post
+              </button>
+            </form>
+          )}
+          <div className="space-y-3">
+            {comments.length === 0 && <p className="text-gray-500">No comments yet.</p>}
+            {comments.map((comment) => {
+              const isCommentAuthor = user && comment.user && user.id === (comment.user._id || comment.user)
+              const isBlogAuthor = user && blog.author && user.id === (blog.author._id || blog.author)
+              return (
+                <div key={comment._id} className="border rounded p-2 mb-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="font-semibold">
+                        <Link
+                          to={`/user/${comment.user?._id || comment.user}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {comment.user?.username || "User"}
+                        </Link>
+                      </span>
+                      <span className="ml-2 text-xs text-gray-500">
+                        {new Date(comment.createdAt).toLocaleString()}
+                      </span>
+                      {editingCommentId === comment._id ? (
+                        <div className="mt-1 flex gap-2">
+                          <input
+                            className="border rounded p-1 flex-1"
+                            value={editingText}
+                            onChange={e => setEditingText(e.target.value)}
+                          />
+                          <button
+                            className="bg-green-600 text-white px-2 py-1 rounded"
+                            onClick={() => handleSaveEdit(comment._id)}
+                            type="button"
+                          >
+                            Save
+                          </button>
+                          <button
+                            className="bg-gray-400 text-white px-2 py-1 rounded"
+                            onClick={() => setEditingCommentId(null)}
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="mt-1">{comment.text}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 ml-2">
+                      {/* Delete: visible for comment author OR blog author */}
+                      {(isCommentAuthor || isBlogAuthor) && (
+                        <button
+                          className="text-red-600 text-xs"
+                          onClick={() => handleDeleteComment(comment._id)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                      {/* Edit: only comment author */}
+                      {isCommentAuthor && (
+                        <button
+                          className="text-blue-600 text-xs"
+                          onClick={() => handleEditComment(comment)}
+                          disabled={editingCommentId === comment._id}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      <button
+                        className="text-xs text-green-600"
+                        onClick={() => {
+                          setReplyingTo(comment._id);
+                          setReplyText("");
+                        }}
+                      >
+                        Reply
+                      </button>
+                    </div>
+                  </div>
+                  {/* Replies */}
+                  <div className="ml-6 mt-2 space-y-2">
+                    {comment.replies && comment.replies.map((reply) => (
+                      <div key={reply._id} className="border-l-2 pl-2">
+                        <span className="font-semibold">
+                          <Link
+                            to={`/user/${reply.user?._id || reply.user}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {reply.user?.username || "User"}
+                          </Link>
+                        </span>
+                        <span className="ml-2 text-xs text-gray-500">
+                          {new Date(reply.createdAt).toLocaleString()}
+                        </span>
+                        <p className="mt-1">{reply.text}</p>
+                      </div>
+                    ))}
+                    {/* Reply input */}
+                    {replyingTo === comment._id && (
+                      <form
+                        className="flex gap-2 mt-2"
+                        onSubmit={e => {
+                          e.preventDefault();
+                          handleReply(comment._id);
+                        }}
+                      >
+                        <input
+                          type="text"
+                          className="flex-1 border p-1 rounded"
+                          placeholder="Write a reply..."
+                          value={replyText}
+                          onChange={e => setReplyText(e.target.value)}
+                        />
+                        <button type="submit" className="bg-green-600 text-white px-2 py-1 rounded">
+                          Reply
+                        </button>
+                        <button
+                          type="button"
+                          className="bg-gray-400 text-white px-2 py-1 rounded"
+                          onClick={() => setReplyingTo(null)}
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              )}
+            )}
+          </div>
+        </div>
 
         {isAuthor && (
           <div className="flex gap-4 mt-6">
