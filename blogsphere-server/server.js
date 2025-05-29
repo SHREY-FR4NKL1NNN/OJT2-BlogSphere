@@ -9,7 +9,14 @@ dotenv.config()
 
 const app = express()
 
-app.use(cors())
+const corsOptions = {
+  origin: [
+    "https://ojt2-blogsphere-1.onrender.com", // your frontend URL
+    "http://localhost:5173" // local dev, if needed
+  ],
+  credentials: true, // if you use cookies or need credentials
+};
+app.use(cors(corsOptions));
 app.use(express.json())
 
 // Ensure upload directories exist
