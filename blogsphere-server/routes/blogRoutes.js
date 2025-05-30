@@ -43,12 +43,12 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-router.get("/search", (req, res, next) => {
-  if (req.query.following === "true") {
-    return authMiddleware(req, res, () => searchBlogs(req, res, next));
-  }
-  return searchBlogs(req, res, next);
-});
+// router.get("/search", (req, res, next) => {
+//   if (req.query.following === "true") {
+//     return authMiddleware(req, res, () => searchBlogs(req, res, next));
+//   }
+//   return searchBlogs(req, res, next);
+// });
 router.get("/feed/personalized", authMiddleware, personalizedFeed);
 router.get("/", getBlogs);
 router.get("/:id", getBlogById);
