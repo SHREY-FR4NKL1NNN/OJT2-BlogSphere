@@ -21,18 +21,18 @@ function App() {
       <SidePanel />
       <Routes>
         <Route
-          path="/api/create"
+          path="/create"
           element={
             <PrivateRoute>
               <CreateBlog />
             </PrivateRoute>
           }
         />
-        <Route path="/api/" element={<Home />} />
-        <Route path="/api/login" element={<Login />} />
-        <Route path="/api/register" element={<Register />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route
-          path="/api/profile"
+          path="/profile"
           element={
             <PrivateRoute>
               <Profile />
@@ -40,9 +40,9 @@ function App() {
           }
         />
         <Route path="*" element={<NotFound />} />
-        <Route path="/api/blogs/:id" element={<BlogDetail />} />
+        <Route path="/blogs/:id" element={<BlogDetail />} />
         <Route
-          path="/api/edit/:id"
+          path="/edit/:id"
           element={
             <PrivateRoute>
               <EditBlog />
@@ -50,7 +50,7 @@ function App() {
           }
         />
         <Route
-          path="/api/settings"
+          path="/settings"
           element={
             <PrivateRoute>
               <Settings />
@@ -58,7 +58,7 @@ function App() {
           }
         />
         <Route
-          path="/api/user/:userId"
+          path="/user/:userId"
           element={
             <PrivateRoute>
               <UserProfile />
@@ -66,7 +66,7 @@ function App() {
           }
         />
         <Route
-          path="/api/bookmarks"
+          path="/bookmarks"
           element={
             <PrivateRoute>
               <Bookmarks />
