@@ -23,7 +23,7 @@ export default function BlogDetail() {
   useEffect(() => {
     const fetchBlog = async () => {
       try {
-        const res = await API.get(`/blogs/${id}`);
+        const res = await API.get(`/api/blogs/${id}`);
         setBlog(res.data);
       } catch (err) {
         console.error(err);
